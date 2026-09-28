@@ -89,7 +89,19 @@ jobs:
 
       - name: Bootstrap pinned dependencies
         working-directory: anip-native
-        run: bash tools/bootstrap_deps.sh
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("tools/bootstrap_deps.sh")
+          s = p.read_text()
+          s = s.replace(
+              'submodule update --init --depth=1 \\\n  lsplant/src/main/jni/external/dex_builder',
+              'submodule update --init --recursive --depth=1 \\\n  lsplant/src/main/jni/external/dex_builder'
+          )
+          p.write_text(s)
+          PY
+          bash tools/bootstrap_deps.sh
 
       - name: Generate embedded ANIP resources
         working-directory: anip-native
@@ -128,3 +140,5 @@ jobs:
 # trigger: build verified uploaded archive and apply link.h patch
 
 # trigger: use preinstalled Android SDK
+
+# trigger: initialize DexBuilder nested submodules recursively
