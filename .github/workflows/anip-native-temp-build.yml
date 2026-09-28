@@ -72,7 +72,9 @@ jobs:
 
       - name: Bootstrap pinned dependencies
         working-directory: /tmp/anip-src/ANIP-KSU-Native
-        run: bash tools/bootstrap_deps.sh
+        run: |
+          sed -i 's/submodule update --init --depth=1/submodule update --init --recursive --depth=1/' tools/bootstrap_deps.sh
+          bash tools/bootstrap_deps.sh
 
       - name: Generate embedded ANIP table
         working-directory: /tmp/anip-src/ANIP-KSU-Native
