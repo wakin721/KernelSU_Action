@@ -50,10 +50,14 @@ jobs:
           python-version: "3.12"
 
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
       - name: Install Android toolchain
         run: |
-          yes | /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --licenses >/dev/null || true
-          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
 
       - name: Install Python image dependencies
         run: |
