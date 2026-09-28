@@ -37,7 +37,9 @@ jobs:
           s = p.read_text()
           if "#include <link.h>" not in s:
               s = s.replace("#include <jni.h>\n", "#include <jni.h>\n#include <link.h>\n")
-              p.write_text(s)
+          if "#include <sys/types.h>" not in s.split("#include \"zygisk.hpp\"")[0]:
+              s = s.replace('#include "zygisk.hpp"\n', '#include <sys/types.h>\n#include "zygisk.hpp"\n', 1)
+          p.write_text(s)
 
           cm = Path("anip-native/native/src/main/cpp/CMakeLists.txt")
           c = cm.read_text()
@@ -151,3 +153,5 @@ jobs:
 # trigger: initialize DexBuilder nested submodules recursively
 
 # trigger: provide libcxx interface to LSPlant standalone
+
+# trigger: include sys/types.h before Zygisk API header
