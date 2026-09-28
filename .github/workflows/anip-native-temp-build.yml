@@ -106,3 +106,5 @@ jobs:
             anip-native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip
             anip-native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip.sha256
           if-no-files-found: error
+
+# trigger: all source chunks uploaded
