@@ -38,6 +38,13 @@ jobs:
           if "#include <link.h>" not in s:
               s = s.replace("#include <jni.h>\n", "#include <jni.h>\n#include <link.h>\n")
               p.write_text(s)
+
+          cm = Path("anip-native/native/src/main/cpp/CMakeLists.txt")
+          c = cm.read_text()
+          marker = "find_package(lsplant REQUIRED CONFIG)\n"
+          if "target_link_libraries(lsplant::lsplant INTERFACE cxx::cxx)" not in c:
+              c = c.replace(marker, marker + "\n# LSPlant standalone is built with -nostdinc++; provide libc++ headers/modules from Prefab.\ntarget_link_libraries(lsplant::lsplant INTERFACE cxx::cxx)\n")
+              cm.write_text(c)
           PY
 
       - name: Set up JDK 17
@@ -142,3 +149,5 @@ jobs:
 # trigger: use preinstalled Android SDK
 
 # trigger: initialize DexBuilder nested submodules recursively
+
+# trigger: provide libcxx interface to LSPlant standalone
