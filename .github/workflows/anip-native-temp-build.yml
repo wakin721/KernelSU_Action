@@ -1,53 +1,34 @@
-name: ANIP Native Temporary Build
+name: Temporary ANIP native build
 
 on:
   push:
     branches:
       - tmp/anip-ksu-native-build-20260928
     paths:
-      - "anip-native-build/chunks2/**"
+      - "anip-native-build/**"
       - ".github/workflows/anip-native-temp-build.yml"
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout temporary build branch
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Reconstruct source archive
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/anip-src
-          find anip-native-build/chunks2 -maxdepth 1 -type f -name '*.b64' ! -name 'part01.b64' ! -name 'part03.b64' -print0 \
-            | sort -z \
-            | xargs -0 cat \
-            | base64 -d > /tmp/anip-source.zip
+          cat anip-native-build/chunks/src{00..07}.b64 > /tmp/anip-source.b64
+          base64 -d /tmp/anip-source.b64 > /tmp/anip-source.zip
           echo "3f2667ca67b4c12b0384c7a61a5feee54f7e3a5021651fa171b56d03869a1558  /tmp/anip-source.zip" | sha256sum -c -
+          rm -rf /tmp/anip-src
+          mkdir -p /tmp/anip-src
           unzip -q /tmp/anip-source.zip -d /tmp/anip-src
-          mv /tmp/anip-src/ANIP-KSU-Native "$GITHUB_WORKSPACE/anip-native"
-          test -f anip-native/native/src/main/cpp/main.cpp
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("anip-native/native/src/main/cpp/main.cpp")
-          s = p.read_text()
-          if "#include <link.h>" not in s:
-              s = s.replace("#include <jni.h>\n", "#include <jni.h>\n#include <link.h>\n")
-          if "#include <sys/types.h>" not in s.split("#include \"zygisk.hpp\"")[0]:
-              s = s.replace('#include "zygisk.hpp"\n', '#include <sys/types.h>\n#include "zygisk.hpp"\n', 1)
-          p.write_text(s)
-
-          cm = Path("anip-native/native/src/main/cpp/CMakeLists.txt")
-          c = cm.read_text()
-          marker = "find_package(lsplant REQUIRED CONFIG)\n"
-          if "target_link_libraries(lsplant::lsplant INTERFACE cxx::cxx)" not in c:
-              c = c.replace(marker, marker + "\n# LSPlant standalone is built with -nostdinc++; provide libc++ headers/modules from Prefab.\ntarget_link_libraries(lsplant::lsplant INTERFACE cxx::cxx)\n")
-              cm.write_text(c)
-          PY
+          test -f /tmp/anip-src/ANIP-KSU-Native/settings.gradle.kts
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -55,7 +36,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle 8.11.1
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
@@ -65,93 +46,53 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Configure preinstalled Android SDK
-        shell: bash
-        run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
-          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
-          test -x /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install Android toolchain
-        shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "ndk;30.0.16248370" \
-            "cmake;3.31.6"
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
 
-      - name: Install Python dependencies
-        shell: bash
+      - name: Install Python image dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libcairo2
           python -m pip install --upgrade pip
           python -m pip install pillow cairosvg
 
-      - name: Run generator self-test
-        working-directory: anip-native
+      - name: Run source self-test
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
         run: python tools/selftest.py
 
       - name: Bootstrap pinned dependencies
-        working-directory: anip-native
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("tools/bootstrap_deps.sh")
-          s = p.read_text()
-          s = s.replace(
-              'submodule update --init --depth=1 \\\n  lsplant/src/main/jni/external/dex_builder',
-              'submodule update --init --recursive --depth=1 \\\n  lsplant/src/main/jni/external/dex_builder'
-          )
-          p.write_text(s)
-          PY
-          bash tools/bootstrap_deps.sh
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
+        run: bash tools/bootstrap_deps.sh
 
-      - name: Generate embedded ANIP resources
-        working-directory: anip-native
+      - name: Generate embedded ANIP table
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
         run: python tools/sync_anip.py --repo .deps/anip
 
-      - name: Build and embed HookBridge DEX
-        working-directory: anip-native
+      - name: Compile embedded HookBridge
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
         run: python tools/build_bridge.py
 
       - name: Build native AAR
-        working-directory: anip-native
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
         run: gradle :native:assembleRelease --no-daemon --stacktrace
 
       - name: Package KernelSU module
-        working-directory: anip-native
+        working-directory: /tmp/anip-src/ANIP-KSU-Native
         run: |
-          python tools/package_module.py \
-            --aar native/build/outputs/aar/native-release.aar \
-            --out dist/ANIP-KSU-Native-v0.2.0-beta1.zip
+          python tools/package_module.py             --aar native/build/outputs/aar/native-release.aar             --out dist/ANIP-KSU-Native-v0.2.0-beta1.zip
           sha256sum dist/ANIP-KSU-Native-v0.2.0-beta1.zip > dist/ANIP-KSU-Native-v0.2.0-beta1.zip.sha256
           unzip -l dist/ANIP-KSU-Native-v0.2.0-beta1.zip
 
-      - name: Upload module artifact
+      - name: Upload module
         uses: actions/upload-artifact@v4
         with:
           name: ANIP-KSU-Native-v0.2.0-beta1
           path: |
-            anip-native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip
-            anip-native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip.sha256
+            /tmp/anip-src/ANIP-KSU-Native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip
+            /tmp/anip-src/ANIP-KSU-Native/dist/ANIP-KSU-Native-v0.2.0-beta1.zip.sha256
           if-no-files-found: error
-
-# trigger: all source chunks uploaded
-
-# trigger: use repaired source chunks
-
-# trigger: build verified uploaded archive and apply link.h patch
-
-# trigger: use preinstalled Android SDK
-
-# trigger: initialize DexBuilder nested submodules recursively
-
-# trigger: provide libcxx interface to LSPlant standalone
-
-# trigger: include sys/types.h before Zygisk API header
