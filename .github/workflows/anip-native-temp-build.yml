@@ -52,8 +52,8 @@ jobs:
 
       - name: Install Android toolchain
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
+          yes | /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --licenses >/dev/null || true
+          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
 
       - name: Install Python image dependencies
         run: |
