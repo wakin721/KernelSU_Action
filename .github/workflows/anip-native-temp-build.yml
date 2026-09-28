@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p /tmp/anip-src
-          find anip-native-build/chunks2 -maxdepth 1 -type f -name '*.b64' -print0 \
+          find anip-native-build/chunks2 -maxdepth 1 -type f -name '*.b64' ! -name 'part01.b64' ! -name 'part03.b64' -print0 \
             | sort -z \
             | xargs -0 cat \
             | base64 -d > /tmp/anip-source.zip
@@ -108,3 +108,5 @@ jobs:
           if-no-files-found: error
 
 # trigger: all source chunks uploaded
+
+# trigger: use repaired source chunks
